@@ -223,6 +223,37 @@
       .map-controls button{width:38px;height:38px;min-height:38px}
     }
 
+
+    .setup-actions,.history-actions{display:flex;gap:10px;flex-wrap:wrap}
+    .history-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+    .history-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:16px 0}
+    .history-summary .stat{min-width:0}
+    .history-list{display:grid;gap:10px}
+    .history-row{
+      border:1px solid var(--border);border-radius:12px;background:var(--panel2);
+      padding:12px;display:grid;grid-template-columns:minmax(0,1.3fr) repeat(4,minmax(70px,.55fr));
+      gap:10px;align-items:center
+    }
+    .history-score{font-size:1.25rem;font-weight:900}
+    .history-label{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+    .history-empty{padding:22px;text-align:center;border:1px dashed var(--border);border-radius:12px;color:var(--muted)}
+    .danger{border-color:var(--bad)!important}
+    @media(max-width:640px){
+      .history-summary{grid-template-columns:1fr 1fr}
+      .history-row{grid-template-columns:1fr 1fr}
+      .history-row .history-main{grid-column:1/-1}
+    }
+
+
+    .problem-areas{margin:16px 0}
+    .problem-card{border:1px solid var(--border);border-radius:14px;padding:14px;background:var(--panel2)}
+    .problem-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap}
+    .problem-list{display:grid;gap:8px;margin-top:12px}
+    .problem-row{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:9px 10px;border-radius:10px;border:1px solid var(--border)}
+    .problem-row strong{display:block}
+    .problem-detail{font-size:.82rem;color:var(--muted)}
+    .problem-rate{font-weight:900;white-space:nowrap}
+
 </style>
 </head>
 <body>
@@ -250,13 +281,6 @@
         </div>
       </label>
       <label>
-        Mode
-        <div class="seg" role="group" aria-label="Quiz mode">
-          <button type="button" id="practiceBtn" class="active" aria-pressed="true">Practice</button>
-          <button type="button" id="quizBtn" aria-pressed="false">Quiz</button>
-        </div>
-      </label>
-      <label>
         Questions
         <select id="count">
           <option value="12">12 — all states</option>
@@ -265,8 +289,8 @@
         </select>
       </label>
     </div>
-    <div class="subtle" id="modeDesc">Practice mode gives a memory tip after mistakes and repeats missed states more often. Abbreviation choices can come from any U.S. state.</div>
-    <button id="startBtn" class="primary" type="button">Start Practice</button>
+    <div class="subtle">Choose the sections and number of states. Abbreviation choices can come from any U.S. state.</div>
+    <div class="setup-actions"><button id="startBtn" class="primary" type="button">Start Quiz</button><button id="historyBtn" class="secondary" type="button">Score History</button></div>
     <div class="footer-note">Requires an internet connection only to load the state boundary data. After that, the quiz runs entirely in this page.</div>
   </section>
 
@@ -276,7 +300,7 @@
         <strong id="roundLabel">1 / 12</strong>
         <div class="bar" aria-hidden="true"><div id="barFill"></div></div>
       </div>
-      <div><span id="modeLabel">Practice</span> · Score <strong id="scoreLabel">0 / 0</strong></div>
+      <div>Score <strong id="scoreLabel">0 / 0</strong></div>
     </div>
 
     <div class="main-grid">
@@ -305,6 +329,24 @@
     </div>
   </section>
 
+
+  <section id="history" class="card results">
+    <div class="history-head">
+      <div>
+        <div class="step">This device</div>
+        <h2 style="margin:.25rem 0 0">Score History</h2>
+      </div>
+      <button id="historyBackBtn" class="secondary" type="button">Back</button>
+    </div>
+    <p class="subtle">Scores are saved only in this browser on this device. No account or server is used.</p>
+    <div id="historySummary" class="history-summary"></div>
+    <div id="problemAreas" class="problem-areas"></div>
+    <div id="historyList" class="history-list"></div>
+    <div class="history-actions">
+      <button id="clearHistoryBtn" class="secondary danger" type="button">Clear Score History</button>
+    </div>
+  </section>
+
   <section id="results" class="card results">
     <div class="step">Results</div>
     <div id="finalScore" class="score-big">0%</div>
@@ -320,6 +362,7 @@
     </div>
     <div class="actions" style="margin-top:18px">
       <button id="againBtn" class="primary" type="button">Play Again</button>
+      <button id="resultsHistoryBtn" class="secondary" type="button">Score History</button>
     </div>
   </section>
 </div>
@@ -401,9 +444,10 @@
   let STATES = SOUTHEAST;
 
   const $ = id => document.getElementById(id);
-  const setup = $("setup"), quiz = $("quiz"), results = $("results");
-  let mode = "practice";
+  const setup = $("setup"), quiz = $("quiz"), results = $("results"), history = $("history");
+  let mode = "quiz";
   let mapFeatures = [];
+  let mapContextStates = null;
   let queue = [];
   let current = null;
   let currentStep = 0;
@@ -412,26 +456,13 @@
   let correct = 0;
   let locked = false;
   let stats = {state:[0,0],abbr:[0,0],capital:[0,0]};
+  let statePerformance = {};
   let missed = new Map();
   let targetRounds = 12;
 
   const stepKeys = ["state","abbr","capital"];
   const stepNames = ["State","Abbreviation","Capital"];
 
-  function setMode(next){
-    mode = next;
-    $("practiceBtn").classList.toggle("active", mode==="practice");
-    $("quizBtn").classList.toggle("active", mode==="quiz");
-    $("practiceBtn").setAttribute("aria-pressed", mode==="practice");
-    $("quizBtn").setAttribute("aria-pressed", mode==="quiz");
-    $("modeDesc").textContent = mode==="practice"
-      ? "Practice mode gives a memory tip after mistakes and repeats missed states more often. Abbreviation choices can come from any U.S. state."
-      : "Quiz mode is scored with no memory tips until the results screen. Abbreviation choices can come from any U.S. state.";
-    $("startBtn").textContent = mode==="practice" ? "Start Practice" : "Start Quiz";
-  }
-
-  $("practiceBtn").addEventListener("click", () => setMode("practice"));
-  $("quizBtn").addEventListener("click", () => setMode("quiz"));
   $("sec1").addEventListener("change", syncRegion);
   $("sec2").addEventListener("change", syncRegion);
   $("sec3").addEventListener("change", syncRegion);
@@ -554,7 +585,8 @@
 
   function drawMap(){
     if (window.__allStateFeatures) {
-      const wanted = new Set(STATES.map(s=>s.id));
+      const contextStates = mapContextStates || STATES;
+      const wanted = new Set(contextStates.map(s=>s.id));
       mapFeatures = window.__allStateFeatures.filter(f=>wanted.has(String(f.id).padStart(2,"0")));
     }
     const root=$("map");
@@ -604,7 +636,6 @@
     $("roundLabel").textContent = `${Math.min(round+1,targetRounds)} / ${targetRounds}`;
     $("barFill").style.width = `${Math.min(100,(round/targetRounds)*100)}%`;
     $("scoreLabel").textContent = `${correct} / ${asked}`;
-    $("modeLabel").textContent = mode==="practice" ? "Practice" : "Quiz";
   }
 
   let selectedChoice = null;
@@ -638,12 +669,6 @@
 
   function markMiss(){
     missed.set(current.name,current);
-    if(mode==="practice" && round+1<targetRounds){
-      // Reinsert a missed state later, replacing a future state only if there is room.
-      const insertAt=Math.min(queue.length, Math.max(1,Math.floor(Math.random()*Math.max(2,queue.length))));
-      queue.splice(insertAt,0,current);
-      if(queue.length > targetRounds-round-1) queue.pop();
-    }
   }
 
   function answerChoice(button,value,field){
@@ -672,6 +697,11 @@
     stats[key][1]++;
     const correctValue=field==="state" ? current.name : current[field];
     const isCorrect=value===correctValue;
+    if(!statePerformance[current.name]){
+      statePerformance[current.name]={state:[0,0],abbr:[0,0],capital:[0,0]};
+    }
+    statePerformance[current.name][key][1]++;
+    if(isCorrect) statePerformance[current.name][key][0]++;
     const buttons=[...$("choices").querySelectorAll(".choice")];
     buttons.forEach(b=>{
       b.disabled=true;
@@ -689,7 +719,6 @@
       markMiss();
       fb.className="feedback show bad";
       let msg=`The correct answer is ${correctValue}.`;
-      if(mode==="practice") msg += ` Memory tip: ${current.tip}`;
       fb.textContent=msg;
     }
     updateHud();
@@ -721,7 +750,187 @@
 
   $("nextBtn").addEventListener("click",advance);
 
-  function finish(){
+  
+  const SCORE_STORAGE_KEY="usStatesQuizScoresV1";
+
+  function getScoreHistory(){
+    try{
+      const parsed=JSON.parse(localStorage.getItem(SCORE_STORAGE_KEY) || "[]");
+      return Array.isArray(parsed) ? parsed : [];
+    }catch(e){
+      return [];
+    }
+  }
+
+  function saveScore(){
+    const selectedSections=[1,2,3,4].filter(n=>$(`sec${n}`).checked);
+    const record={
+      id:Date.now(),
+      date:new Date().toISOString(),
+      sections:selectedSections,
+      states:targetRounds,
+      correct,
+      asked,
+      percent:asked ? Math.round((correct/asked)*100) : 0,
+      state:[...stats.state],
+      abbr:[...stats.abbr],
+      capital:[...stats.capital],
+      perState:statePerformance
+    };
+    const scores=getScoreHistory();
+    scores.unshift(record);
+    // Keep the most recent 100 attempts on the device.
+    try{ localStorage.setItem(SCORE_STORAGE_KEY,JSON.stringify(scores.slice(0,100))); }catch(e){}
+  }
+
+
+  function getProblemAreas(scores){
+    const agg={};
+    scores.forEach(s=>{
+      if(!s.perState) return;
+      Object.entries(s.perState).forEach(([name,cats])=>{
+        if(!agg[name]) agg[name]={correct:0,asked:0,state:[0,0],abbr:[0,0],capital:[0,0]};
+        ["state","abbr","capital"].forEach(k=>{
+          const v=cats[k];
+          if(!Array.isArray(v)) return;
+          agg[name][k][0]+=Number(v[0])||0;
+          agg[name][k][1]+=Number(v[1])||0;
+          agg[name].correct+=Number(v[0])||0;
+          agg[name].asked+=Number(v[1])||0;
+        });
+      });
+    });
+    return Object.entries(agg)
+      .filter(([,v])=>v.asked>0 && v.correct<v.asked)
+      .map(([name,v])=>({name,...v,rate:v.correct/v.asked}))
+      .sort((a,b)=>a.rate-b.rate || b.asked-a.asked);
+  }
+
+  function startProblemQuiz(){
+    const scores=getScoreHistory();
+    const problems=getProblemAreas(scores);
+    if(!problems.length) return;
+
+    const problemNames=problems.slice(0,Math.min(6,problems.length)).map(p=>p.name);
+    const allSelected=[...new Map(
+      [SOUTHEAST,NORTHEAST,GREAT_LAKES,CENTRAL_PLAINS].flat().map(s=>[s.name,s])
+    ).values()];
+    const problemStates=problemNames.map(n=>allSelected.find(s=>s.name===n)).filter(Boolean);
+    const extras=shuffle(allSelected.filter(s=>!problemNames.includes(s.name)))
+      .slice(0,Math.max(2,Math.ceil(problemStates.length/2)));
+    const custom=[...problemStates,...extras];
+
+    STATES=custom;
+
+    // For remediation quizzes, keep the question pool focused but show the
+    // complete surrounding module geography so the highlighted state has context.
+    const modules=[SOUTHEAST,NORTHEAST,GREAT_LAKES,CENTRAL_PLAINS];
+    const quizNames=new Set(custom.map(s=>s.name));
+    mapContextStates=[...new Map(
+      modules
+        .filter(module=>module.some(s=>quizNames.has(s.name)))
+        .flat()
+        .map(s=>[s.name,s])
+    ).values()];
+
+    targetRounds=custom.length;
+    round=0; asked=0; correct=0; currentStep=0; locked=false;
+    stats={state:[0,0],abbr:[0,0],capital:[0,0]};
+    statePerformance={};
+    missed=new Map();
+    queue=shuffle([...custom]);
+    current=getCurrentRoundState();
+
+    history.classList.remove("active");
+    setup.classList.add("hidden");
+    results.classList.remove("active");
+    quiz.classList.add("active");
+    drawMap(); updateHud(); renderStep();
+  }
+
+  function renderHistory(){
+    const scores=getScoreHistory();
+    const list=$("historyList");
+    const summary=$("historySummary");
+    const problemBox=$("problemAreas");
+    list.innerHTML="";
+    problemBox.innerHTML="";
+    if(!scores.length){
+      summary.innerHTML="";
+      list.innerHTML='<div class="history-empty">No saved quiz scores on this device yet.</div>';
+      return;
+    }
+    const avg=Math.round(scores.reduce((a,s)=>a+(Number(s.percent)||0),0)/scores.length);
+    const best=Math.max(...scores.map(s=>Number(s.percent)||0));
+    const problems=getProblemAreas(scores);
+    summary.innerHTML=`
+      <div class="stat"><span class="subtle">Attempts</span><strong>${scores.length}</strong></div>
+      <div class="stat"><span class="subtle">Average</span><strong>${avg}%</strong></div>
+      <div class="stat"><span class="subtle">Best</span><strong>${best}%</strong></div>`;
+
+    if(problems.length){
+      const shown=problems.slice(0,8);
+      problemBox.innerHTML=`
+        <div class="problem-card">
+          <div class="problem-head">
+            <div><strong>Problem areas</strong><div class="subtle">Based on answers saved on this device.</div></div>
+            <button id="problemQuizBtn" class="primary" type="button">Quiz Problem Areas</button>
+          </div>
+          <div class="problem-list">
+            ${shown.map(p=>{
+              const weak=["state","abbr","capital"]
+                .filter(k=>p[k][1] && p[k][0]<p[k][1])
+                .map(k=>k==="state"?"state ID":k==="abbr"?"abbreviation":"capital")
+                .join(", ");
+              return `<div class="problem-row"><div><strong>${p.name}</strong><div class="problem-detail">Work on: ${weak}</div></div><div class="problem-rate">${Math.round(p.rate*100)}%</div></div>`;
+            }).join("")}
+          </div>
+        </div>`;
+      $("problemQuizBtn").addEventListener("click",startProblemQuiz);
+    }else if(scores.some(s=>s.perState)){
+      problemBox.innerHTML='<div class="history-empty">No problem areas detected yet.</div>';
+    }else{
+      problemBox.innerHTML='<div class="history-empty">Problem-area tracking will begin with your next quiz.</div>';
+    }
+
+    scores.forEach(s=>{
+      const row=document.createElement("div");
+      row.className="history-row";
+      const d=new Date(s.date);
+      const when=Number.isNaN(d.getTime()) ? "Saved quiz" : d.toLocaleString([],{
+        year:"numeric",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"
+      });
+      const sections=(s.sections||[]).length ? `Sections ${(s.sections||[]).join(", ")}` : "Sections not recorded";
+      const fmt=x=>Array.isArray(x)?`${x[0]} / ${x[1]}`:"—";
+      row.innerHTML=`
+        <div class="history-main">
+          <div class="history-score">${s.percent}%</div>
+          <div><strong>${s.correct} / ${s.asked}</strong> correct</div>
+          <div class="subtle">${when} · ${sections} · ${s.states || "—"} states</div>
+        </div>
+        <div><div class="history-label">States</div><strong>${fmt(s.state)}</strong></div>
+        <div><div class="history-label">Abbr.</div><strong>${fmt(s.abbr)}</strong></div>
+        <div><div class="history-label">Capitals</div><strong>${fmt(s.capital)}</strong></div>
+      `;
+      list.appendChild(row);
+    });
+  }
+
+  function openHistory(){
+    setup.classList.add("hidden");
+    quiz.classList.remove("active");
+    results.classList.remove("active");
+    history.classList.add("active");
+    renderHistory();
+  }
+
+  function closeHistory(){
+    history.classList.remove("active");
+    setup.classList.remove("hidden");
+  }
+
+function finish(){
+    if(quiz.classList.contains("active")) saveScore();
     quiz.classList.remove("active");
     results.classList.add("active");
     const pct=asked ? Math.round((correct/asked)*100) : 0;
@@ -742,6 +951,16 @@
     });
   }
 
+  $("historyBtn").addEventListener("click",openHistory);
+  $("resultsHistoryBtn").addEventListener("click",openHistory);
+  $("historyBackBtn").addEventListener("click",closeHistory);
+  $("clearHistoryBtn").addEventListener("click",()=>{
+    if(confirm("Clear all saved quiz scores from this device?")){
+      try{ localStorage.removeItem(SCORE_STORAGE_KEY); }catch(e){}
+      renderHistory();
+    }
+  });
+
   $("quitBtn").addEventListener("click",finish);
   $("againBtn").addEventListener("click",()=>{
     results.classList.remove("active");
@@ -751,13 +970,16 @@
   $("startBtn").addEventListener("click",()=>{
     syncRegion();
     if (!STATES.length) return;
+    mapContextStates=null;
     round=0; asked=0; correct=0; currentStep=0; locked=false;
     stats={state:[0,0],abbr:[0,0],capital:[0,0]};
+    statePerformance={};
     missed=new Map();
     buildQueue();
     current=getCurrentRoundState();
     setup.classList.add("hidden");
     results.classList.remove("active");
+    history.classList.remove("active");
     quiz.classList.add("active");
     drawMap(); updateHud(); renderStep();
   });
@@ -772,8 +994,9 @@
   $("zoomOutBtn").addEventListener("click",()=>zoomMap(1/1.35));
   $("resetMapBtn").addEventListener("click",()=>centerHighlightedState(true));
   syncRegion();
+    const initialContext = mapContextStates || STATES;
     mapFeatures = window.__allStateFeatures.filter(f =>
-      new Set(STATES.map(s=>s.id)).has(String(f.id).padStart(2,"0"))
+      new Set(initialContext.map(s=>s.id)).has(String(f.id).padStart(2,"0"))
     );
     const loading=$("map").querySelector(".map-loading");
     if(loading) loading.textContent="Map ready.";
