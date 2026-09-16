@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>U.S. States Quiz</title>
+  <style>
+    :root{
+      color-scheme: light dark;
+      --bg:#0f172a;
+      --panel:#111827;
+      --panel2:#1f2937;
+      --text:#f8fafc;
+      --muted:#cbd5e1;
+      --border:#334155;
+      --accent:#60a5fa;
+      --accent2:#93c5fd;
+      --good:#22c55e;
+      --bad:#ef4444;
+      --warn:#f59e0b;
+      --map:#334155;
+      --map-stroke:#cbd5e1;
+      --highlight:#fbbf24;
+      --shadow:0 18px 45px rgba(0,0,0,.24);
+    }
+    @media (prefers-color-scheme: light){
+      :root{
+        --bg:#f1f5f9;
+        --panel:#ffffff;
+        --panel2:#f8fafc;
+        --text:#0f172a;
+        --muted:#475569;
+        --border:#cbd5e1;
+        --accent:#2563eb;
+        --accent2:#1d4ed8;
+        --good:#15803d;
+        --bad:#dc2626;
+        --warn:#b45309;
+        --map:#e2e8f0;
+        --map-stroke:#334155;
+        --highlight:#f59e0b;
+        --shadow:0 18px 45px rgba(15,23,42,.12);
+      }
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      min-height:100vh;
+      background:var(--bg);
+      color:var(--text);
+      font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    }
+    button,select{font:inherit}
+    button{cursor:pointer}
+    .app{max-width:1100px;margin:0 auto;padding:18px}
+    .topbar{
+      display:flex;gap:12px;justify-content:space-between;align-items:center;flex-wrap:wrap;
+      margin-bottom:16px
+    }
+    h1{font-size:clamp(1.4rem,4vw,2rem);margin:0}
+    .subtle{color:var(--muted);font-size:.95rem}
+    .card{
+      background:var(--panel);border:1px solid var(--border);border-radius:18px;box-shadow:var(--shadow)
+    }
+    .setup{padding:18px;display:grid;gap:16px}
+    .setup-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    @media(max-width:700px){.setup-grid{grid-template-columns:1fr}}
+    label{display:grid;gap:7px;font-weight:700}
+    select,.seg button{
+      min-height:46px;border-radius:12px;border:1px solid var(--border);
+      background:var(--panel2);color:var(--text);padding:10px 12px
+    }
+    .seg{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .section-picker{display:grid;gap:8px}
+    .checkrow{display:flex;align-items:center;gap:9px;font-weight:700;padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:var(--panel2)}
+    .checkrow input{width:20px;height:20px}
+    .section-actions{display:flex;gap:8px;flex-wrap:wrap}
+    .seg button.active{outline:2px solid var(--accent);background:rgba(96,165,250,.12)}
+    .primary{
+      min-height:48px;border:none;border-radius:12px;background:var(--accent);color:white;
+      font-weight:800;padding:12px 18px
+    }
+    .secondary{
+      min-height:44px;border-radius:12px;border:1px solid var(--border);
+      background:var(--panel2);color:var(--text);font-weight:700;padding:10px 14px
+    }
+    .quiz{display:none;gap:16px}
+    .quiz.active{display:grid}
+    .hud{padding:14px 16px;display:flex;gap:12px;justify-content:space-between;align-items:center;flex-wrap:wrap}
+    .progress{display:flex;gap:10px;align-items:center;min-width:220px;flex:1}
+    .bar{height:10px;background:var(--panel2);border-radius:999px;overflow:hidden;flex:1;border:1px solid var(--border)}
+    .bar > div{height:100%;background:var(--accent);width:0%}
+    .main-grid{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(320px,.8fr);gap:16px}
+    @media(max-width:850px){.main-grid{grid-template-columns:1fr}}
+    .map-card{padding:14px}
+    .map-wrap{
+      min-height:380px;border-radius:14px;border:1px solid var(--border);background:var(--panel2);
+      display:grid;place-items:center;overflow:hidden;position:relative
+    }
+    @media(max-width:600px){.map-wrap{min-height:300px}}
+    #map svg{width:100%;height:auto;display:block}
+    .map-loading{padding:20px;text-align:center;color:var(--muted)}
+    .question-card{padding:18px;display:grid;gap:14px;align-content:start}
+    .step{font-size:.84rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:800}
+    #prompt{font-size:clamp(1.25rem,3vw,1.7rem);font-weight:850;line-height:1.2}
+    .choices{display:grid;gap:10px}
+    .choice{
+      text-align:left;min-height:52px;border-radius:12px;border:1px solid var(--border);
+      background:var(--panel2);color:var(--text);padding:12px 14px;font-weight:750;
+      transition:transform .12s ease,border-color .12s ease
+    }
+    .choice:hover{transform:translateY(-1px)}
+    .choice.correct{border-color:var(--good);outline:2px solid color-mix(in srgb,var(--good) 55%,transparent)}
+    .choice.wrong{border-color:var(--bad);outline:2px solid color-mix(in srgb,var(--bad) 55%,transparent)}
+    .choice:disabled{cursor:default;opacity:.98}
+    .feedback{
+      display:none;padding:12px 14px;border-radius:12px;border:1px solid var(--border);
+      background:var(--panel2);line-height:1.45
+    }
+    .feedback.show{display:block}
+    .feedback.good{border-color:var(--good)}
+    .feedback.bad{border-color:var(--bad)}
+    .actions{display:flex;gap:10px;flex-wrap:wrap}
+    .results{display:none;padding:18px}
+    .results.active{display:block}
+    .score-big{font-size:clamp(2.2rem,9vw,4.5rem);font-weight:900;line-height:1}
+    .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:18px 0}
+    @media(max-width:650px){.stats{grid-template-columns:1fr}}
+    .stat{padding:14px;border:1px solid var(--border);border-radius:14px;background:var(--panel2)}
+    .stat strong{font-size:1.35rem;display:block}
+    .review{display:grid;gap:10px;margin-top:16px}
+    .review-item{padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--panel2)}
+    .hidden{display:none!important}
+    .kbd{border:1px solid var(--border);border-bottom-width:2px;border-radius:7px;padding:1px 6px;font-size:.78rem;color:var(--muted)}
+    .footer-note{margin-top:14px;color:var(--muted);font-size:.86rem}
+  
+    /* Touch-friendly answer spacing */
+    #answers, .answers, .options, .answer-grid {
+      gap: 22px !important;
+    }
+    #answers button, .answers button, .options button, .answer-grid button,
+    .answer, .option, .choice {
+      min-height: 82px !important;
+      padding: 20px 24px !important;
+      margin: 0 !important;
+      font-size: clamp(1.05rem, 2.5vw, 1.3rem) !important;
+      line-height: 1.25 !important;
+      border-radius: 16px !important;
+      touch-action: manipulation;
+    }
+    @media (max-width: 640px) {
+      #answers, .answers, .options, .answer-grid {
+        gap: 28px !important;
+      }
+      #answers button, .answers button, .options button, .answer-grid button,
+      .answer, .option, .choice {
+        min-height: 92px !important;
+        padding: 24px 18px !important;
+      }
+    }
+
+  </style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <div>
+      <h1>U.S. States Quiz</h1>
+      <div class="subtle">Choose one or more quiz sections, then identify each highlighted state, abbreviation, and capital.</div>
+    </div>
+  </div>
+
+  <section id="setup" class="card setup">
+    <div class="setup-grid">
+      <label>
+        Sections
+        <div class="section-picker" id="sectionPicker">
+          <label class="checkrow"><input type="checkbox" id="sec1" checked> Section 1 — Southeast (12 states)</label>
+          <label class="checkrow"><input type="checkbox" id="sec2"> Section 2 — Northeast / Mid-Atlantic (11 states)</label>
+          <label class="checkrow"><input type="checkbox" id="sec3"> Section 3 — Great Lakes + Illinois Border States (10 states)</label>
+          <label class="checkrow"><input type="checkbox" id="sec4"> Section 4 — Central Plains (6 states)</label>
+          <div class="section-actions">
+            <button type="button" class="secondary" id="selectAllBtn">Select All</button>
+            <button type="button" class="secondary" id="clearAllBtn">Clear</button>
+          </div>
+        </div>
+      </label>
+      <label>
+        Mode
+        <div class="seg" role="group" aria-label="Quiz mode">
+          <button type="button" id="practiceBtn" class="active" aria-pressed="true">Practice</button>
+          <button type="button" id="quizBtn" aria-pressed="false">Quiz</button>
+        </div>
+      </label>
+      <label>
+        Questions
+        <select id="count">
+          <option value="12">12 — all states</option>
+          <option value="8">8</option>
+          <option value="6">6</option>
+        </select>
+      </label>
+    </div>
+    <div class="subtle" id="modeDesc">Practice mode gives a memory tip after mistakes and repeats missed states more often. Abbreviation choices can come from any U.S. state.</div>
+    <button id="startBtn" class="primary" type="button">Start Practice</button>
+    <div class="footer-note">Requires an internet connection only to load the state boundary data. After that, the quiz runs entirely in this page.</div>
+  </section>
+
+  <section id="quiz" class="quiz">
+    <div class="card hud">
+      <div class="progress">
+        <strong id="roundLabel">1 / 12</strong>
+        <div class="bar" aria-hidden="true"><div id="barFill"></div></div>
+      </div>
+      <div><span id="modeLabel">Practice</span> · Score <strong id="scoreLabel">0 / 0</strong></div>
+    </div>
+
+    <div class="main-grid">
+      <div class="card map-card">
+        <div id="map" class="map-wrap">
+          <div class="map-loading">Loading map…</div>
+        </div>
+      </div>
+
+      <div class="card question-card">
+        <div class="step" id="stepLabel">Step 1 of 3 · State</div>
+        <div id="prompt">Which state is highlighted?</div>
+        <div id="choices" class="choices"></div>
+        <div id="feedback" class="feedback" aria-live="polite"></div>
+        <div class="actions">
+          <button id="nextBtn" type="button" class="primary hidden">Continue</button>
+          <button id="quitBtn" type="button" class="secondary">End Quiz</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="results" class="card results">
+    <div class="step">Results</div>
+    <div id="finalScore" class="score-big">0%</div>
+    <p id="finalText" class="subtle"></p>
+    <div class="stats">
+      <div class="stat"><span class="subtle">State identification</span><strong id="stateStat">0 / 0</strong></div>
+      <div class="stat"><span class="subtle">Abbreviations</span><strong id="abbrStat">0 / 0</strong></div>
+      <div class="stat"><span class="subtle">Capitals</span><strong id="capitalStat">0 / 0</strong></div>
+    </div>
+    <div id="reviewBlock">
+      <h2>Review missed states</h2>
+      <div id="review" class="review"></div>
+    </div>
+    <div class="actions" style="margin-top:18px">
+      <button id="againBtn" class="primary" type="button">Play Again</button>
+    </div>
+  </section>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
+<script>
+(() => {
+  const SOUTHEAST = [
+    {id:"05",name:"Arkansas",abbr:"AR",capital:"Little Rock",tip:"Think of a little rock sitting in Arkansas: Arkansas → Little Rock."},
+    {id:"22",name:"Louisiana",abbr:"LA",capital:"Baton Rouge",tip:"Louisiana's capital sounds French, just like much of the state's culture: Baton Rouge."},
+    {id:"28",name:"Mississippi",abbr:"MS",capital:"Jackson",tip:"Jackson is the capital of Mississippi — think 'Mississippi Jackson.'"},
+    {id:"01",name:"Alabama",abbr:"AL",capital:"Montgomery",tip:"Montgomery, Alabama is strongly tied to Civil Rights history."},
+    {id:"47",name:"Tennessee",abbr:"TN",capital:"Nashville",tip:"Nashville is famous for country music, and it is Tennessee's capital."},
+    {id:"21",name:"Kentucky",abbr:"KY",capital:"Frankfort",tip:"Kentucky's capital is Frankfort — not Louisville or Lexington."},
+    {id:"54",name:"West Virginia",abbr:"WV",capital:"Charleston",tip:"West Virginia → Charleston. Think 'Charleston in the mountains.'"},
+    {id:"51",name:"Virginia",abbr:"VA",capital:"Richmond",tip:"Richmond was a major Virginia city in U.S. history and is the state capital."},
+    {id:"37",name:"North Carolina",abbr:"NC",capital:"Raleigh",tip:"North Carolina → Raleigh. Picture Raleigh sitting in the middle of NC."},
+    {id:"45",name:"South Carolina",abbr:"SC",capital:"Columbia",tip:"South Carolina → Columbia. Don't confuse it with Charleston."},
+    {id:"13",name:"Georgia",abbr:"GA",capital:"Atlanta",tip:"Atlanta is Georgia's largest city and its capital: Georgia → GA → Atlanta."},
+    {id:"12",name:"Florida",abbr:"FL",capital:"Tallahassee",tip:"Florida's capital is Tallahassee — not Miami or Orlando."}
+  ];
+
+  const NORTHEAST = [
+    {id:"23",name:"Maine",abbr:"ME",capital:"Augusta",tip:"Maine → ME → Augusta. Augusta is inland, not the larger coastal city of Portland."},
+    {id:"33",name:"New Hampshire",abbr:"NH",capital:"Concord",tip:"New Hampshire → NH → Concord. Think 'concord' means agreement in New Hampshire."},
+    {id:"50",name:"Vermont",abbr:"VT",capital:"Montpelier",tip:"Vermont → VT → Montpelier. Montpelier is the smallest U.S. state capital by population."},
+    {id:"25",name:"Massachusetts",abbr:"MA",capital:"Boston",tip:"Massachusetts → MA → Boston. Boston is the best-known city in the state and also its capital."},
+    {id:"44",name:"Rhode Island",abbr:"RI",capital:"Providence",tip:"Rhode Island → RI → Providence. Think of Providence as Rhode Island's main city."},
+    {id:"09",name:"Connecticut",abbr:"CT",capital:"Hartford",tip:"Connecticut → CT → Hartford. Hartford sits near the center of the state."},
+    {id:"36",name:"New York",abbr:"NY",capital:"Albany",tip:"New York's capital is Albany, not New York City."},
+    {id:"42",name:"Pennsylvania",abbr:"PA",capital:"Harrisburg",tip:"Pennsylvania → PA → Harrisburg. Philadelphia and Pittsburgh are larger, but Harrisburg is the capital."},
+    {id:"34",name:"New Jersey",abbr:"NJ",capital:"Trenton",tip:"New Jersey → NJ → Trenton. Trenton is on the Delaware River across from Pennsylvania."},
+    {id:"10",name:"Delaware",abbr:"DE",capital:"Dover",tip:"Delaware → DE → Dover. Both begin with D."},
+    {id:"24",name:"Maryland",abbr:"MD",capital:"Annapolis",tip:"Maryland → MD → Annapolis. Annapolis is also home to the U.S. Naval Academy."}
+  ];
+
+  const GREAT_LAKES = [
+    {id:"27",name:"Minnesota",abbr:"MN",capital:"Saint Paul",tip:"Minnesota → MN; Saint Paul is the capital."},
+    {id:"55",name:"Wisconsin",abbr:"WI",capital:"Madison",tip:"Wisconsin → WI; Madison is the capital."},
+    {id:"17",name:"Illinois",abbr:"IL",capital:"Springfield",tip:"Illinois → IL; Springfield, not Chicago, is the capital."},
+    {id:"18",name:"Indiana",abbr:"IN",capital:"Indianapolis",tip:"Indiana → IN; Indianapolis is the capital."},
+    {id:"26",name:"Michigan",abbr:"MI",capital:"Lansing",tip:"Michigan → MI; Lansing, not Detroit, is the capital."},
+    {id:"39",name:"Ohio",abbr:"OH",capital:"Columbus",tip:"Ohio → OH; Columbus is the capital."},
+    {id:"42",name:"Pennsylvania",abbr:"PA",capital:"Harrisburg",tip:"Pennsylvania → PA; Harrisburg is the capital."},
+    {id:"36",name:"New York",abbr:"NY",capital:"Albany",tip:"New York → NY; Albany, not New York City, is the capital."},
+    {id:"19",name:"Iowa",abbr:"IA",capital:"Des Moines",tip:"Iowa → IA; Des Moines is the capital."},
+    {id:"29",name:"Missouri",abbr:"MO",capital:"Jefferson City",tip:"Missouri → MO; Jefferson City is the capital."}
+  ];
+
+  const CENTRAL_PLAINS = [
+    {id:"38",name:"North Dakota",abbr:"ND",capital:"Bismarck",tip:"North Dakota → ND; Bismarck is the capital."},
+    {id:"46",name:"South Dakota",abbr:"SD",capital:"Pierre",tip:"South Dakota → SD; Pierre is the capital."},
+    {id:"31",name:"Nebraska",abbr:"NE",capital:"Lincoln",tip:"Nebraska → NE; Lincoln is the capital."},
+    {id:"19",name:"Iowa",abbr:"IA",capital:"Des Moines",tip:"Iowa → IA; Des Moines is the capital."},
+    {id:"29",name:"Missouri",abbr:"MO",capital:"Jefferson City",tip:"Missouri → MO; Jefferson City is the capital."},
+    {id:"20",name:"Kansas",abbr:"KS",capital:"Topeka",tip:"Kansas → KS; Topeka is the capital."}
+  ];
+
+
+
+
+  const ALL_STATES = [
+    ["Alabama","AL"],["Alaska","AK"],["Arizona","AZ"],["Arkansas","AR"],
+    ["California","CA"],["Colorado","CO"],["Connecticut","CT"],["Delaware","DE"],
+    ["Florida","FL"],["Georgia","GA"],["Hawaii","HI"],["Idaho","ID"],
+    ["Illinois","IL"],["Indiana","IN"],["Iowa","IA"],["Kansas","KS"],
+    ["Kentucky","KY"],["Louisiana","LA"],["Maine","ME"],["Maryland","MD"],
+    ["Massachusetts","MA"],["Michigan","MI"],["Minnesota","MN"],["Mississippi","MS"],
+    ["Missouri","MO"],["Montana","MT"],["Nebraska","NE"],["Nevada","NV"],
+    ["New Hampshire","NH"],["New Jersey","NJ"],["New Mexico","NM"],["New York","NY"],
+    ["North Carolina","NC"],["North Dakota","ND"],["Ohio","OH"],["Oklahoma","OK"],
+    ["Oregon","OR"],["Pennsylvania","PA"],["Rhode Island","RI"],["South Carolina","SC"],
+    ["South Dakota","SD"],["Tennessee","TN"],["Texas","TX"],["Utah","UT"],
+    ["Vermont","VT"],["Virginia","VA"],["Washington","WA"],["West Virginia","WV"],
+    ["Wisconsin","WI"],["Wyoming","WY"]
+  ].map(([name,abbr]) => ({name,abbr}));
+
+  let STATES = SOUTHEAST;
+
+  const $ = id => document.getElementById(id);
+  const setup = $("setup"), quiz = $("quiz"), results = $("results");
+  let mode = "practice";
+  let mapFeatures = [];
+  let queue = [];
+  let current = null;
+  let currentStep = 0;
+  let round = 0;
+  let asked = 0;
+  let correct = 0;
+  let locked = false;
+  let stats = {state:[0,0],abbr:[0,0],capital:[0,0]};
+  let missed = new Map();
+  let targetRounds = 12;
+
+  const stepKeys = ["state","abbr","capital"];
+  const stepNames = ["State","Abbreviation","Capital"];
+
+  function setMode(next){
+    mode = next;
+    $("practiceBtn").classList.toggle("active", mode==="practice");
+    $("quizBtn").classList.toggle("active", mode==="quiz");
+    $("practiceBtn").setAttribute("aria-pressed", mode==="practice");
+    $("quizBtn").setAttribute("aria-pressed", mode==="quiz");
+    $("modeDesc").textContent = mode==="practice"
+      ? "Practice mode gives a memory tip after mistakes and repeats missed states more often. Abbreviation choices can come from any U.S. state."
+      : "Quiz mode is scored with no memory tips until the results screen. Abbreviation choices can come from any U.S. state.";
+    $("startBtn").textContent = mode==="practice" ? "Start Practice" : "Start Quiz";
+  }
+
+  $("practiceBtn").addEventListener("click", () => setMode("practice"));
+  $("quizBtn").addEventListener("click", () => setMode("quiz"));
+  $("sec1").addEventListener("change", syncRegion);
+  $("sec2").addEventListener("change", syncRegion);
+  $("sec3").addEventListener("change", syncRegion);
+  $("sec4").addEventListener("change", syncRegion);
+  $("selectAllBtn").addEventListener("click", () => {
+    $("sec1").checked = true;
+    $("sec2").checked = true;
+    $("sec3").checked = true;
+    $("sec4").checked = true;
+    syncRegion();
+  });
+  $("clearAllBtn").addEventListener("click", () => {
+    $("sec1").checked = false;
+    $("sec2").checked = false;
+    $("sec3").checked = false;
+    $("sec4").checked = false;
+    syncRegion();
+  });
+
+  function shuffle(arr){
+    const a=[...arr];
+    for(let i=a.length-1;i>0;i--){
+      const j=Math.floor(Math.random()*(i+1));
+      [a[i],a[j]]=[a[j],a[i]];
+    }
+    return a;
+  }
+
+  function syncRegion(){
+    const selected = [];
+    if ($("sec1").checked) selected.push(...SOUTHEAST);
+    if ($("sec2").checked) selected.push(...NORTHEAST);
+    if ($("sec3").checked) selected.push(...GREAT_LAKES);
+    if ($("sec4").checked) selected.push(...CENTRAL_PLAINS);
+
+    const dedup = new Map(selected.map(s => [s.name, s]));
+    STATES = [...dedup.values()];
+
+    const count = $("count");
+    const allOption = count.options[0];
+    allOption.value = String(STATES.length || 1);
+    allOption.textContent = STATES.length ? `${STATES.length} — all selected states` : "Select at least one section";
+    count.disabled = STATES.length === 0;
+    $("startBtn").disabled = STATES.length === 0;
+
+    if (STATES.length && Number(count.value) > STATES.length) {
+      count.value = String(STATES.length);
+    }
+  }
+
+  function buildQueue(){
+    syncRegion();
+    targetRounds = Math.min(Number($("count").value), STATES.length);
+    queue = shuffle(STATES).slice(0,targetRounds);
+  }
+
+  function getCurrentRoundState(){
+    if(queue.length === 0) return null;
+    return queue.shift();
+  }
+
+  function distractors(field, answer){
+    const correctVal = field==="state" ? answer.name : answer[field];
+
+    // State-name and capital distractors stay within the selected quiz section.
+    if(field !== "abbr"){
+      const pool = shuffle(STATES.filter(s=>s.name!==answer.name));
+      const vals = pool.slice(0,3).map(s => field==="state" ? s.name : s[field]);
+      return shuffle([correctVal,...vals]);
+    }
+
+    // Abbreviation distractors may come from any U.S. state.
+    // Prefer near-misses sharing the first or second letter so choices are harder.
+    const others = ALL_STATES.filter(s => s.abbr !== answer.abbr);
+    const sameFirst = shuffle(others.filter(s => s.abbr[0] === answer.abbr[0]));
+    const sameSecond = shuffle(others.filter(s =>
+      s.abbr[1] === answer.abbr[1] && s.abbr[0] !== answer.abbr[0]
+    ));
+    const remaining = shuffle(others.filter(s =>
+      s.abbr[0] !== answer.abbr[0] && s.abbr[1] !== answer.abbr[1]
+    ));
+
+    const picked = [];
+    for (const group of [sameFirst, sameSecond, remaining]) {
+      for (const s of group) {
+        if (picked.length >= 3) break;
+        if (!picked.some(x => x.abbr === s.abbr)) picked.push(s);
+      }
+      if (picked.length >= 3) break;
+    }
+    return shuffle([correctVal, ...picked.map(s => s.abbr)]);
+  }
+
+  function drawMap(){
+    if (window.__allStateFeatures) {
+      const wanted = new Set(STATES.map(s=>s.id));
+      mapFeatures = window.__allStateFeatures.filter(f=>wanted.has(String(f.id).padStart(2,"0")));
+    }
+    const root = $("map");
+    if(!mapFeatures.length){
+      root.innerHTML = '<div class="map-loading">Map data failed to load. Check your internet connection and reload the page.</div>';
+      return;
+    }
+    root.innerHTML = "";
+    const w=760,h=520;
+    const svg=d3.select(root).append("svg").attr("viewBox",`0 0 ${w} ${h}`).attr("role","img")
+      .attr("aria-label","Map of the selected quiz-section states with one state highlighted");
+    const collection={type:"FeatureCollection",features:mapFeatures};
+    const projection=d3.geoAlbersUsa().fitExtent([[24,24],[w-24,h-24]],collection);
+    const path=d3.geoPath(projection);
+    svg.selectAll("path").data(mapFeatures).join("path")
+      .attr("d",path)
+      .attr("fill",d => String(d.id).padStart(2,"0")===current.id ? "var(--highlight)" : "var(--map)")
+      .attr("stroke","var(--map-stroke)")
+      .attr("stroke-width",1.5)
+      .attr("vector-effect","non-scaling-stroke");
+  }
+
+  function updateHud(){
+    $("roundLabel").textContent = `${Math.min(round+1,targetRounds)} / ${targetRounds}`;
+    $("barFill").style.width = `${Math.min(100,(round/targetRounds)*100)}%`;
+    $("scoreLabel").textContent = `${correct} / ${asked}`;
+    $("modeLabel").textContent = mode==="practice" ? "Practice" : "Quiz";
+  }
+
+  function renderStep(){
+    locked=false;
+    $("nextBtn").classList.add("hidden");
+    const feedback=$("feedback");
+    feedback.className="feedback";
+    feedback.textContent="";
+    const field=stepKeys[currentStep];
+    $("stepLabel").textContent=`Step ${currentStep+1} of 3 · ${stepNames[currentStep]}`;
+    $("prompt").textContent = currentStep===0
+      ? "Which state is highlighted?"
+      : currentStep===1
+        ? `What is the two-letter abbreviation for ${current.name}?`
+        : `What is the capital of ${current.name}?`;
+
+    const choices=$("choices");
+    choices.innerHTML="";
+    distractors(field,current).forEach(val=>{
+      const b=document.createElement("button");
+      b.type="button"; b.className="choice"; b.textContent=val;
+      b.addEventListener("click",()=>answerChoice(b,val,field));
+      choices.appendChild(b);
+    });
+  }
+
+  function markMiss(){
+    missed.set(current.name,current);
+    if(mode==="practice" && round+1<targetRounds){
+      // Reinsert a missed state later, replacing a future state only if there is room.
+      const insertAt=Math.min(queue.length, Math.max(1,Math.floor(Math.random()*Math.max(2,queue.length))));
+      queue.splice(insertAt,0,current);
+      if(queue.length > targetRounds-round-1) queue.pop();
+    }
+  }
+
+  function answerChoice(button,value,field){
+    if(locked) return;
+    locked=true;
+    asked++;
+    const key=field==="state" ? "state" : field;
+    stats[key][1]++;
+    const correctValue=field==="state" ? current.name : current[field];
+    const isCorrect=value===correctValue;
+    const buttons=[...$("choices").querySelectorAll(".choice")];
+    buttons.forEach(b=>{
+      b.disabled=true;
+      if(b.textContent===correctValue) b.classList.add("correct");
+    });
+
+    const fb=$("feedback");
+    if(isCorrect){
+      correct++;
+      stats[key][0]++;
+      fb.className="feedback show good";
+      fb.textContent="Nice work.";
+    }else{
+      button.classList.add("wrong");
+      markMiss();
+      fb.className="feedback show bad";
+      let msg=`The correct answer is ${correctValue}.`;
+      if(mode==="practice") msg += ` Memory tip: ${current.tip}`;
+      fb.textContent=msg;
+    }
+    updateHud();
+
+    if(field==="state" && !isCorrect){
+      currentStep=2; // causes continue to finish the state and skip abbr/capital
+      $("nextBtn").textContent="Next State";
+    }else if(currentStep<2){
+      $("nextBtn").textContent="Continue";
+    }else{
+      $("nextBtn").textContent="Next State";
+    }
+    $("nextBtn").classList.remove("hidden");
+  }
+
+  function advance(){
+    if(currentStep<2){
+      currentStep++;
+      renderStep();
+      return;
+    }
+    round++;
+    if(round>=targetRounds || queue.length===0){
+      finish();
+      return;
+    }
+    current=getCurrentRoundState();
+    currentStep=0;
+    drawMap();
+    updateHud();
+    renderStep();
+  }
+
+  $("nextBtn").addEventListener("click",advance);
+
+  function finish(){
+    quiz.classList.remove("active");
+    results.classList.add("active");
+    const pct=asked ? Math.round((correct/asked)*100) : 0;
+    $("finalScore").textContent=`${pct}%`;
+    $("finalText").textContent=`You answered ${correct} of ${asked} scored questions correctly.`;
+    $("stateStat").textContent=`${stats.state[0]} / ${stats.state[1]}`;
+    $("abbrStat").textContent=`${stats.abbr[0]} / ${stats.abbr[1]}`;
+    $("capitalStat").textContent=`${stats.capital[0]} / ${stats.capital[1]}`;
+    const review=$("review");
+    review.innerHTML="";
+    const arr=[...missed.values()];
+    $("reviewBlock").classList.toggle("hidden",arr.length===0);
+    arr.forEach(s=>{
+      const d=document.createElement("div");
+      d.className="review-item";
+      d.innerHTML=`<strong>${s.name} — ${s.abbr} — ${s.capital}</strong><div class="subtle" style="margin-top:5px">${s.tip}</div>`;
+      review.appendChild(d);
+    });
+  }
+
+  $("quitBtn").addEventListener("click",finish);
+  $("againBtn").addEventListener("click",()=>{
+    results.classList.remove("active");
+    setup.classList.remove("hidden");
+  });
+
+  $("startBtn").addEventListener("click",()=>{
+    syncRegion();
+    if (!STATES.length) return;
+    round=0; asked=0; correct=0; currentStep=0; locked=false;
+    stats={state:[0,0],abbr:[0,0],capital:[0,0]};
+    missed=new Map();
+    buildQueue();
+    current=getCurrentRoundState();
+    setup.classList.add("hidden");
+    results.classList.remove("active");
+    quiz.classList.add("active");
+    drawMap(); updateHud(); renderStep();
+  });
+
+  syncRegion();
+
+  Promise.all([
+    fetch("https://cdn.jsdelivr.net/npm/us-atlas@3.0.1/states-10m.json").then(r=>r.json())
+  ]).then(([us])=>{
+    window.__allStateFeatures = topojson.feature(us,us.objects.states).features;
+    syncRegion();
+    mapFeatures = window.__allStateFeatures.filter(f =>
+      new Set(STATES.map(s=>s.id)).has(String(f.id).padStart(2,"0"))
+    );
+    const loading=$("map").querySelector(".map-loading");
+    if(loading) loading.textContent="Map ready.";
+  }).catch(()=>{
+    const loading=$("map").querySelector(".map-loading");
+    if(loading) loading.textContent="Map data could not load. Check your internet connection and reload.";
+  });
+})();
+</script>
+</body>
+</html>
