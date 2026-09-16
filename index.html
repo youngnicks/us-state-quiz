@@ -200,6 +200,29 @@
       .actions{display:none!important}
     }
 
+
+    /* Interactive map viewport */
+    .map-wrap{touch-action:none;cursor:grab;user-select:none}
+    .map-wrap.dragging{cursor:grabbing}
+    .map-wrap svg{width:100%;height:100%!important;display:block}
+    .map-controls{
+      position:absolute;right:8px;bottom:8px;z-index:4;
+      display:flex;gap:6px;padding:5px;border-radius:12px;
+      background:color-mix(in srgb,var(--panel) 88%,transparent);
+      border:1px solid var(--border);
+    }
+    .map-controls button{
+      width:42px;height:42px;min-height:42px;padding:0!important;margin:0!important;
+      border:1px solid var(--border);border-radius:9px;background:var(--panel2);
+      color:var(--text);font-size:1.3rem;font-weight:850;line-height:1;
+    }
+    @media(max-width:640px){
+      .map-wrap{height:205px!important;min-height:205px!important}
+      .map-card{padding:5px!important}
+      .map-controls{right:5px;bottom:5px}
+      .map-controls button{width:38px;height:38px;min-height:38px}
+    }
+
 </style>
 </head>
 <body>
@@ -260,6 +283,11 @@
       <div class="card map-card">
         <div id="map" class="map-wrap">
           <div class="map-loading">Loading map…</div>
+          <div class="map-controls" aria-label="Map zoom controls">
+            <button id="zoomOutBtn" type="button" aria-label="Zoom out">−</button>
+            <button id="resetMapBtn" type="button" aria-label="Center highlighted state">◎</button>
+            <button id="zoomInBtn" type="button" aria-label="Zoom in">+</button>
+          </div>
         </div>
       </div>
 
@@ -497,29 +525,79 @@
     return shuffle([correctVal, ...picked.map(s => s.abbr)]);
   }
 
+  let mapZoom = null;
+  let mapSvg = null;
+  let mapLayer = null;
+  let mapProjection = null;
+  let mapPath = null;
+
+  function centerHighlightedState(animated=false){
+    if(!mapSvg || !mapZoom || !mapPath || !current) return;
+    const feature=mapFeatures.find(f=>String(f.id).padStart(2,"0")===current.id);
+    if(!feature) return;
+
+    const [[x0,y0],[x1,y1]]=mapPath.bounds(feature);
+    const cx=(x0+x1)/2, cy=(y0+y1)/2;
+    const vw=760, vh=520;
+    const stateW=Math.max(20,x1-x0), stateH=Math.max(20,y1-y0);
+
+    // Show the highlighted state prominently but preserve surrounding context.
+    let scale=Math.min(4.2,Math.max(1.35,Math.min(vw/(stateW*3.0),vh/(stateH*3.0))));
+    const transform=d3.zoomIdentity
+      .translate(vw/2,vh/2)
+      .scale(scale)
+      .translate(-cx,-cy);
+
+    const target=animated ? mapSvg.transition().duration(250) : mapSvg;
+    target.call(mapZoom.transform,transform);
+  }
+
   function drawMap(){
     if (window.__allStateFeatures) {
       const wanted = new Set(STATES.map(s=>s.id));
       mapFeatures = window.__allStateFeatures.filter(f=>wanted.has(String(f.id).padStart(2,"0")));
     }
-    const root = $("map");
+    const root=$("map");
     if(!mapFeatures.length){
-      root.innerHTML = '<div class="map-loading">Map data failed to load. Check your internet connection and reload the page.</div>';
+      root.innerHTML='<div class="map-loading">Map data failed to load. Check your internet connection and reload the page.</div>';
       return;
     }
-    root.innerHTML = "";
+
+    // Preserve/recreate controls while replacing only the SVG.
+    root.querySelector("svg")?.remove();
+    root.querySelector(".map-loading")?.remove();
+
     const w=760,h=520;
-    const svg=d3.select(root).append("svg").attr("viewBox",`0 0 ${w} ${h}`).attr("role","img")
-      .attr("aria-label","Map of the selected quiz-section states with one state highlighted");
+    mapSvg=d3.select(root).insert("svg",":first-child")
+      .attr("viewBox",`0 0 ${w} ${h}`)
+      .attr("role","img")
+      .attr("aria-label","Interactive map of selected quiz states; drag to pan and use the buttons to zoom");
+
     const collection={type:"FeatureCollection",features:mapFeatures};
-    const projection=d3.geoAlbersUsa().fitExtent([[24,24],[w-24,h-24]],collection);
-    const path=d3.geoPath(projection);
-    svg.selectAll("path").data(mapFeatures).join("path")
-      .attr("d",path)
-      .attr("fill",d => String(d.id).padStart(2,"0")===current.id ? "var(--highlight)" : "var(--map)")
+    mapProjection=d3.geoAlbersUsa().fitExtent([[28,28],[w-28,h-28]],collection);
+    mapPath=d3.geoPath(mapProjection);
+    mapLayer=mapSvg.append("g");
+
+    mapLayer.selectAll("path").data(mapFeatures).join("path")
+      .attr("d",mapPath)
+      .attr("fill",d=>String(d.id).padStart(2,"0")===current.id?"var(--highlight)":"var(--map)")
       .attr("stroke","var(--map-stroke)")
       .attr("stroke-width",1.5)
       .attr("vector-effect","non-scaling-stroke");
+
+    mapZoom=d3.zoom()
+      .scaleExtent([0.8,7])
+      .on("start",()=>root.classList.add("dragging"))
+      .on("zoom",event=>mapLayer.attr("transform",event.transform))
+      .on("end",()=>root.classList.remove("dragging"));
+
+    mapSvg.call(mapZoom).on("dblclick.zoom",null);
+    centerHighlightedState(false);
+  }
+
+  function zoomMap(factor){
+    if(!mapSvg || !mapZoom) return;
+    mapSvg.transition().duration(180).call(mapZoom.scaleBy,factor);
   }
 
   function updateHud(){
@@ -690,7 +768,10 @@
     fetch("https://cdn.jsdelivr.net/npm/us-atlas@3.0.1/states-10m.json").then(r=>r.json())
   ]).then(([us])=>{
     window.__allStateFeatures = topojson.feature(us,us.objects.states).features;
-    syncRegion();
+    $("zoomInBtn").addEventListener("click",()=>zoomMap(1.35));
+  $("zoomOutBtn").addEventListener("click",()=>zoomMap(1/1.35));
+  $("resetMapBtn").addEventListener("click",()=>centerHighlightedState(true));
+  syncRegion();
     mapFeatures = window.__allStateFeatures.filter(f =>
       new Set(STATES.map(s=>s.id)).has(String(f.id).padStart(2,"0"))
     );
