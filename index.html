@@ -159,7 +159,48 @@
       }
     }
 
-  </style>
+  
+    /* Compact smartphone quiz layout */
+    .choice.selected{
+      border-color:var(--accent)!important;
+      outline:3px solid color-mix(in srgb,var(--accent) 55%,transparent)!important;
+      background:color-mix(in srgb,var(--accent) 14%,var(--panel2))!important;
+    }
+    .tap-confirm{
+      display:none;
+      color:var(--muted);
+      font-size:.82rem;
+      font-weight:750;
+      text-align:center;
+      margin-top:-4px;
+    }
+    .tap-confirm.show{display:block}
+    @media(max-width:640px){
+      .app{padding:8px}
+      .topbar{margin-bottom:8px}
+      .topbar .subtle{display:none}
+      h1{font-size:1.2rem}
+      .quiz{gap:8px}
+      .hud{padding:8px 10px;gap:6px;font-size:.84rem}
+      .progress{min-width:140px}
+      .main-grid{gap:8px}
+      .map-card{padding:6px}
+      .map-wrap{min-height:0;height:170px}
+      .question-card{padding:10px;gap:8px}
+      .step{font-size:.7rem}
+      #prompt{font-size:1.05rem}
+      #choices,.choices{gap:12px!important}
+      #choices .choice,.choices .choice{
+        min-height:54px!important;
+        padding:10px 14px!important;
+        font-size:1rem!important;
+        border-radius:12px!important;
+      }
+      .feedback{padding:8px 10px;font-size:.88rem}
+      .actions{display:none!important}
+    }
+
+</style>
 </head>
 <body>
 <div class="app">
@@ -226,6 +267,7 @@
         <div class="step" id="stepLabel">Step 1 of 3 · State</div>
         <div id="prompt">Which state is highlighted?</div>
         <div id="choices" class="choices"></div>
+        <div id="tapConfirm" class="tap-confirm" aria-live="polite">Tap the highlighted answer again to submit.</div>
         <div id="feedback" class="feedback" aria-live="polite"></div>
         <div class="actions">
           <button id="nextBtn" type="button" class="primary hidden">Continue</button>
@@ -487,9 +529,14 @@
     $("modeLabel").textContent = mode==="practice" ? "Practice" : "Quiz";
   }
 
+  let selectedChoice = null;
+
   function renderStep(){
     locked=false;
+    selectedChoice=null;
     $("nextBtn").classList.add("hidden");
+    const tapConfirm=$("tapConfirm");
+    if(tapConfirm){ tapConfirm.classList.remove("show"); tapConfirm.textContent="Tap the highlighted answer again to submit."; }
     const feedback=$("feedback");
     feedback.className="feedback";
     feedback.textContent="";
@@ -523,7 +570,25 @@
 
   function answerChoice(button,value,field){
     if(locked) return;
+
+    const confirm=$("tapConfirm");
+
+    // First tap selects only. Tapping a different answer changes the selection.
+    if(selectedChoice !== button){
+      [...$("choices").querySelectorAll(".choice")].forEach(b=>b.classList.remove("selected"));
+      selectedChoice=button;
+      button.classList.add("selected");
+      if(confirm){
+        confirm.textContent="Tap the highlighted answer again to submit.";
+        confirm.classList.add("show");
+      }
+      return;
+    }
+
+    // Second tap on the same answer submits it.
     locked=true;
+    button.classList.remove("selected");
+    if(confirm) confirm.classList.remove("show");
     asked++;
     const key=field==="state" ? "state" : field;
     stats[key][1]++;
@@ -551,15 +616,11 @@
     }
     updateHud();
 
+    // No Continue button is needed: briefly show feedback, then move on.
     if(field==="state" && !isCorrect){
-      currentStep=2; // causes continue to finish the state and skip abbr/capital
-      $("nextBtn").textContent="Next State";
-    }else if(currentStep<2){
-      $("nextBtn").textContent="Continue";
-    }else{
-      $("nextBtn").textContent="Next State";
+      currentStep=2; // skip abbreviation/capital after a missed state
     }
-    $("nextBtn").classList.remove("hidden");
+    window.setTimeout(advance, isCorrect ? 650 : 1400);
   }
 
   function advance(){
