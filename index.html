@@ -275,6 +275,7 @@
           <label class="checkrow"><input type="checkbox" id="sec3"> Section 3 — Great Lakes + Illinois Border States (10 states)</label>
           <label class="checkrow"><input type="checkbox" id="sec4"> Section 4 — Central Plains (6 states)</label>
           <label class="checkrow"><input type="checkbox" id="sec5"> Section 5 — Southwest (4 states)</label>
+          <label class="checkrow"><input type="checkbox" id="sec6"> Section 6 — Mountain West (6 states)</label>
           <div class="section-actions">
             <button type="button" class="secondary" id="selectAllBtn">Select All</button>
             <button type="button" class="secondary" id="clearAllBtn">Clear</button>
@@ -430,6 +431,15 @@
     {id:"04",name:"Arizona",abbr:"AZ",capital:"Phoenix",tip:"Arizona → Phoenix."}
   ];
 
+  const MOUNTAIN_WEST = [
+    {id:"56",name:"Wyoming",abbr:"WY",capital:"Cheyenne",tip:"Wyoming → Cheyenne."},
+    {id:"30",name:"Montana",abbr:"MT",capital:"Helena",tip:"Montana → Helena."},
+    {id:"16",name:"Idaho",abbr:"ID",capital:"Boise",tip:"Idaho → Boise."},
+    {id:"32",name:"Nevada",abbr:"NV",capital:"Carson City",tip:"Nevada → Carson City."},
+    {id:"49",name:"Utah",abbr:"UT",capital:"Salt Lake City",tip:"Utah → Salt Lake City."},
+    {id:"08",name:"Colorado",abbr:"CO",capital:"Denver",tip:"Colorado → Denver."}
+  ];
+
 
 
 
@@ -476,6 +486,7 @@
   $("sec3").addEventListener("change", syncRegion);
   $("sec4").addEventListener("change", syncRegion);
   $("sec5").addEventListener("change", syncRegion);
+  $("sec6").addEventListener("change", syncRegion);
   $("selectAllBtn").addEventListener("click", () => {
     $("sec1").checked = true;
     $("sec2").checked = true;
@@ -507,6 +518,7 @@
     if ($("sec3").checked) selected.push(...GREAT_LAKES);
     if ($("sec4").checked) selected.push(...CENTRAL_PLAINS);
     if ($("sec5").checked) selected.push(...SOUTHWEST);
+    if ($("sec6").checked) selected.push(...MOUNTAIN_WEST);
 
     const dedup = new Map(selected.map(s => [s.name, s]));
     STATES = [...dedup.values()];
@@ -773,7 +785,7 @@
   }
 
   function saveScore(){
-    const selectedSections=[1,2,3,4,5].filter(n=>$(`sec${n}`).checked);
+    const selectedSections=[1,2,3,4,5,6].filter(n=>$(`sec${n}`).checked);
     const record={
       id:Date.now(),
       date:new Date().toISOString(),
@@ -823,7 +835,7 @@
 
     const problemNames=problems.slice(0,Math.min(6,problems.length)).map(p=>p.name);
     const allSelected=[...new Map(
-      [SOUTHEAST,NORTHEAST,GREAT_LAKES,CENTRAL_PLAINS,SOUTHWEST].flat().map(s=>[s.name,s])
+      [SOUTHEAST,NORTHEAST,GREAT_LAKES,CENTRAL_PLAINS,SOUTHWEST,MOUNTAIN_WEST].flat().map(s=>[s.name,s])
     ).values()];
     const problemStates=problemNames.map(n=>allSelected.find(s=>s.name===n)).filter(Boolean);
     const extras=shuffle(allSelected.filter(s=>!problemNames.includes(s.name)))
@@ -834,7 +846,7 @@
 
     // For remediation quizzes, keep the question pool focused but show the
     // complete surrounding module geography so the highlighted state has context.
-    const modules=[SOUTHEAST,NORTHEAST,GREAT_LAKES,CENTRAL_PLAINS,SOUTHWEST];
+    const modules=[SOUTHEAST,NORTHEAST,GREAT_LAKES,CENTRAL_PLAINS,SOUTHWEST,MOUNTAIN_WEST];
     const quizNames=new Set(custom.map(s=>s.name));
     mapContextStates=[...new Map(
       modules
